@@ -1,0 +1,6 @@
+{
+  "web": 4,
+  "files": ["index.html", "app.css", "app.js"],
+  "notes": "v4：启动时不再弹无意义的检查提示（只有手动检查才提示）",
+  "apkVersionCode": 4
+}

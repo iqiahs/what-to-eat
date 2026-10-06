@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#F1FAF6">
+<title>今天吃什么</title>
+<link rel="stylesheet" href="app.css">
+<script>
+/* 尽早把配色贴上，避免首屏闪一下默认色（原生桥可用时优先读原生存储） */
+(function () {
+  var ok = ["mint", "sky", "peach", "lemon", "night"];
+  var bg = { mint: "#F1FAF6", sky: "#F1F8FE", peach: "#FFF6F4", lemon: "#FFFCF1", night: "#12100E" };
+  var id = "mint";
+  try {
+    if (window.Native && window.Native.getSetting) id = window.Native.getSetting("theme") || "mint";
+    else id = localStorage.getItem("pref_theme") || "mint";
+  } catch (e) {}
+  if (ok.indexOf(id) < 0) id = "mint";
+  document.documentElement.setAttribute("data-theme", id);
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute("content", bg[id]);
+})();
+</script>
+</head>
+<body>
+
+<div id="banner" class="banner" hidden>
+  <span id="bannerText"></span>
+  <button id="bannerBtn" class="banner-btn">去下载</button>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<header class="head">
+  <h1>今天吃什么</h1>
+  <p class="sub">是啊，吃什么</p>
+</header>
+
+<nav class="chips" id="chips"></nav>
+
+<main class="main">
+  <section class="card" id="card">
+    <div class="placeholder" id="placeholder">
+      <div class="ph-emoji">🍚</div>
+      <div class="ph-text">别纠结了，点下面按钮<br>让命运帮你选一顿</div>
+    </div>
+    <div class="result" id="result" hidden>
+      <div class="dish" id="dishName"></div>
+      <div class="meta" id="dishMeta"></div>
+    </div>
+  </section>
+
+  <button class="gen" id="genBtn">生成</button>
+  <p class="hint" id="hint">共 <span id="poolCount">0</span> 道候选</p>
+</main>
+
+<footer class="foot">
+  <button class="ghost" id="openMine">我的菜谱 · <span id="mineCount">0</span></button>
+  <button class="ghost" id="openSet">设置</button>
+</footer>
+
+<!-- 我的菜谱 -->
+<div class="sheet" id="mineSheet" hidden>
+  <div class="sheet-head">
+    <span>我的菜谱</span>
+    <button class="close" data-close="mineSheet">完成</button>
+  </div>
+  <div class="sheet-body">
+    <div class="add-row">
+      <input id="newDish" class="input" type="text" placeholder="输入菜名，例如：麻辣香锅" maxlength="20">
+      <select id="newCat" class="input sel">
+        <option value="正餐">正餐</option>
+        <option value="早餐">早餐</option>
+        <option value="夜宵">夜宵</option>
+        <option value="小吃">小吃</option>
+      </select>
+      <button class="add" id="addBtn">添加</button>
+    </div>
+    <p class="tip">自定义的菜保存在本机，不会因为更新而丢失。</p>
+    <ul class="list" id="mineList"></ul>
+    <button class="danger" id="clearMine">清空我的菜谱</button>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="sheet" id="setSheet" hidden>
+  <div class="sheet-head">
+    <span>设置</span>
+    <button class="close" data-close="setSheet">完成</button>
+  </div>
+  <div class="sheet-body">
+    <label class="label">界面配色（点一下立刻换）</label>
+    <div class="swatches" id="swatches"></div>
+
+    <label class="label">更新源（GitHub 用户名/仓库名）</label>
+    <input id="srcInput" class="input" type="text" placeholder="例如：zhangsan/what-to-eat" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="primary" id="saveSrc">保存更新源</button>
+
+    <div class="info" id="infoBox"></div>
+
+    <button class="primary" id="checkBtn">立即检查网页更新</button>
+    <button class="ghost2" id="diagBtn">测试更新源（热更新不生效时点这里）</button>
+    <div class="info diag" id="diagBox" hidden></div>
+    <button class="ghost2" id="apkBtn">下载最新版 App（APK）</button>
+    <button class="ghost2" id="resetBtn">恢复内置版本</button>
+
+    <p class="tip">
+      热更新原理：这个 App 的界面其实是网页，每次启动会去你的 GitHub 仓库读
+      <code>version.json</code>，发现版本号更高就自动把新网页下载到手机，
+      下次打开就是新版，<b>不用重新安装</b>。
+    </p>
+  </div>
+</div>
+
+<div class="mask" id="mask" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
