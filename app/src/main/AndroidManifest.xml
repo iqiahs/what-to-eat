@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 只申请联网权限（热更新用），不申请存储/相机等敏感权限，减少被手机安全中心拦截的概率 -->
+    <!-- 只申请联网（热更新）和振动（生成时轻震），不申请存储/相机等敏感权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"

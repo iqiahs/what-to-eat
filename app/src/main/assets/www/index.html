@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#F1FAF6">
+<meta name="theme-color" content="#F3F7F5">
 <title>今天吃什么</title>
 <link rel="stylesheet" href="app.css">
 <script>
 /* 尽早把配色贴上，避免首屏闪一下默认色（原生桥可用时优先读原生存储） */
 (function () {
-  var ok = ["mint", "sky", "peach", "lemon", "night"];
-  var bg = { mint: "#F1FAF6", sky: "#F1F8FE", peach: "#FFF6F4", lemon: "#FFFCF1", night: "#12100E" };
-  var id = "mint";
+  var ok = ["celadon", "indigo", "clay", "apricot", "ink"];
+  var bg = { celadon: "#F3F7F5", indigo: "#F4F6FA", clay: "#FBF6F2", apricot: "#FBF9F3", ink: "#16181A" };
+  var id = "celadon";
   try {
-    if (window.Native && window.Native.getSetting) id = window.Native.getSetting("theme") || "mint";
-    else id = localStorage.getItem("pref_theme") || "mint";
+    if (window.Native && window.Native.getSetting) id = window.Native.getSetting("theme") || "celadon";
+    else id = localStorage.getItem("pref_theme") || "celadon";
   } catch (e) {}
-  if (ok.indexOf(id) < 0) id = "mint";
+  if (ok.indexOf(id) < 0) id = "celadon";
   document.documentElement.setAttribute("data-theme", id);
   var m = document.querySelector('meta[name="theme-color"]');
   if (m) m.setAttribute("content", bg[id]);
@@ -27,7 +27,7 @@
 
 <div id="banner" class="banner" hidden>
   <span id="bannerText"></span>
-  <button id="bannerBtn" class="banner-btn">去下载</button>
+  <button id="bannerBtn" class="banner-btn">去更新</button>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -49,21 +49,22 @@
       <div class="dish" id="dishName"></div>
       <div class="meta" id="dishMeta"></div>
     </div>
+    <div class="tipmsg" id="tipMsg" hidden></div>
   </section>
 
   <button class="gen" id="genBtn">生成</button>
   <p class="hint" id="hint">共 <span id="poolCount">0</span> 道候选</p>
+  <button class="manage-row" id="manageRow" hidden>＋ 添加 / 管理我的菜</button>
 </main>
 
 <footer class="foot">
-  <button class="ghost" id="openMine">我的菜谱 · <span id="mineCount">0</span></button>
   <button class="ghost" id="openSet">设置</button>
 </footer>
 
-<!-- 我的菜谱 -->
+<!-- 我的食堂 -->
 <div class="sheet" id="mineSheet" hidden>
   <div class="sheet-head">
-    <span>我的菜谱</span>
+    <span>我的食堂</span>
     <button class="close" data-close="mineSheet">完成</button>
   </div>
   <div class="sheet-body">
@@ -77,9 +78,9 @@
       </select>
       <button class="add" id="addBtn">添加</button>
     </div>
-    <p class="tip">自定义的菜保存在本机，不会因为更新而丢失。</p>
+    <p class="add-tip">把食堂或餐馆里能点到的菜填进来，以后就抽自己的菜。</p>
     <ul class="list" id="mineList"></ul>
-    <button class="danger" id="clearMine">清空我的菜谱</button>
+    <button class="danger" id="clearMine">清空我的食堂</button>
   </div>
 </div>
 
@@ -90,12 +91,24 @@
     <button class="close" data-close="setSheet">完成</button>
   </div>
   <div class="sheet-body">
-    <label class="label">界面配色（点一下立刻换）</label>
+    <label class="label">界面配色</label>
     <div class="swatches" id="swatches"></div>
 
-    <label class="label">更新源（GitHub 用户名/仓库名）</label>
-    <input id="srcInput" class="input" type="text" placeholder="例如：zhangsan/what-to-eat" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <button class="primary" id="saveSrc">保存更新源</button>
+    <label class="label">震动强度</label>
+    <div class="seg" id="vibSeg">
+      <button data-v="0">关</button>
+      <button data-v="1">轻</button>
+      <button data-v="2">中</button>
+      <button data-v="3">强</button>
+    </div>
+
+    <label class="label">提示音音量</label>
+    <div class="seg" id="sndSeg">
+      <button data-v="0">关</button>
+      <button data-v="1">轻</button>
+      <button data-v="2">中</button>
+      <button data-v="3">强</button>
+    </div>
 
     <div class="info" id="infoBox"></div>
 
@@ -104,12 +117,6 @@
     <div class="info diag" id="diagBox" hidden></div>
     <button class="ghost2" id="apkBtn">下载最新版 App（APK）</button>
     <button class="ghost2" id="resetBtn">恢复内置版本</button>
-
-    <p class="tip">
-      热更新原理：这个 App 的界面其实是网页，每次启动会去你的 GitHub 仓库读
-      <code>version.json</code>，发现版本号更高就自动把新网页下载到手机，
-      下次打开就是新版，<b>不用重新安装</b>。
-    </p>
   </div>
 </div>
 

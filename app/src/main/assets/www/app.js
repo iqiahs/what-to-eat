@@ -203,12 +203,17 @@ var BUILTIN = BUILTIN_RAW.map(function (d) {
 
 /* ---------------- 状态 ---------------- */
 var CATS = ["全部", "早餐", "正餐", "夜宵", "小吃"];
+var MINE_CAT = "我的食堂";   // 固定排在「全部」右边第一个
 var state = {
   filter: "全部",
   custom: [],
   last: null,
   generated: false,
-  info: {}
+  info: {},
+  genCount: 0,      // 没有自定义菜时，点了几次生成
+  hintShown: false, // 引导语是否已经给过（每个用户只给一次）
+  vibLevel: 2,      // 震动强度 0~3
+  sndLevel: 1       // 提示音音量 0~3
 };
 
 var $ = function (id) { return document.getElementById(id); };
@@ -259,16 +264,38 @@ function savePref(key, value) {
   try { localStorage.setItem("pref_" + key, value); } catch (e) {}
 }
 
+/* 档位选择控件（震动/音量）：4 个按钮，选中项高亮 */
+function bindSeg(id, stateKey, prefKey, onChange) {
+  var box = $(id);
+  if (!box) return;
+  var btns = box.querySelectorAll("button");
+  function paint() {
+    Array.prototype.forEach.call(btns, function (b) {
+      b.className = (Number(b.getAttribute("data-v")) === state[stateKey]) ? "on" : "";
+    });
+  }
+  Array.prototype.forEach.call(btns, function (b) {
+    b.onclick = function () {
+      state[stateKey] = Number(b.getAttribute("data-v"));
+      savePref(prefKey, String(state[stateKey]));
+      paint();
+      if (onChange) onChange(state[stateKey]);
+    };
+  });
+  paint();
+}
+
 /* ---------------- 配色主题 ---------------- */
+/* 用低饱和的实物色，而不是糖果色渐变：更接近正常 App 的观感 */
 var THEMES = [
-  { id: "mint",  name: "薄荷",  dot: "linear-gradient(135deg,#5FD6B4,#34C79A)", bg: "#F1FAF6" },
-  { id: "sky",   name: "晴空",  dot: "linear-gradient(135deg,#6FC2F5,#3D9BE9)", bg: "#F1F8FE" },
-  { id: "peach", name: "蜜桃",  dot: "linear-gradient(135deg,#FFB3A0,#FF8A80)", bg: "#FFF6F4" },
-  { id: "lemon", name: "柠檬",  dot: "linear-gradient(135deg,#FFD24C,#F2B705)", bg: "#FFFCF1" },
-  { id: "night", name: "深夜",  dot: "linear-gradient(135deg,#4A382A,#FF7A3D)", bg: "#12100E" }
+  { id: "celadon", name: "青瓷", dot: "#3E7F6A", bg: "#F3F7F5" },
+  { id: "indigo",  name: "靛蓝", dot: "#3B5487", bg: "#F4F6FA" },
+  { id: "clay",    name: "陶土", dot: "#B45A3C", bg: "#FBF6F2" },
+  { id: "apricot", name: "杏黄", dot: "#A87C22", bg: "#FBF9F3" },
+  { id: "ink",     name: "墨黑", dot: "#D9A441", bg: "#16181A" }
 ];
 
-var themeId = "mint";
+var themeId = "celadon";
 
 function themeById(id) {
   for (var i = 0; i < THEMES.length; i++) {
@@ -328,12 +355,12 @@ function toast(msg) {
 function renderChips() {
   var box = $("chips");
   box.innerHTML = "";
-  var cats = CATS.slice();
-  if (state.custom.length > 0) cats.push("自定义");
+  // 顺序：全部 → 我的食堂 → 早餐 → 正餐 → 夜宵 → 小吃
+  var cats = ["全部", MINE_CAT, "早餐", "正餐", "夜宵", "小吃"];
   cats.forEach(function (c) {
     var b = document.createElement("button");
     b.className = "chip" + (state.filter === c ? " on" : "");
-    b.textContent = c;
+    b.textContent = c + (c === MINE_CAT && state.custom.length > 0 ? " " + state.custom.length : "");
     b.onclick = function () {
       state.filter = c;
       renderChips();
@@ -346,11 +373,11 @@ function renderChips() {
 /* ---------------- 候选菜池 ---------------- */
 function pool() {
   var all = BUILTIN.concat(state.custom.map(function (c) {
-    return { name: c.name, cat: c.cat || "正餐", tags: ["我的菜谱"], mine: true };
+    return { name: c.name, cat: c.cat || "正餐", tags: [], mine: true };
   }));
   var picked;
   if (state.filter === "全部") picked = all;
-  else if (state.filter === "自定义") picked = all.filter(function (d) { return d.mine; });
+  else if (state.filter === MINE_CAT) picked = all.filter(function (d) { return d.mine; });
   else picked = all.filter(function (d) { return d.cat === state.filter; });
 
   // 同一道菜可能同时属于多个分类（比如螺蛳粉既是正餐也是夜宵），按名字去重
@@ -364,16 +391,90 @@ function pool() {
 }
 
 function updateHint() {
-  var n = pool().length;
-  $("poolCount").textContent = n;
-  $("mineCount").textContent = state.custom.length;
+  $("poolCount").textContent = pool().length;
+  // 选中「我的食堂」时，把"添加/管理"入口显示出来
+  var mr = $("manageRow");
+  if (mr) mr.hidden = (state.filter !== MINE_CAT);
+}
+
+/* ---------------- 震动 & 提示音 ---------------- */
+var audioCtx = null;
+
+function doFeedback() {
+  // 震动优先走原生（Android 需要 VIBRATE 权限，网页版没有就忽略）
+  var lv = state.vibLevel;
+  if (lv > 0) {
+    try {
+      if (NATIVE && NATIVE.vibrate) NATIVE.vibrate(lv);
+      else if (navigator.vibrate) navigator.vibrate(10 * lv);
+    } catch (e) {}
+  }
+  playTick(state.sndLevel);
+}
+
+/* 很轻的一声"嗒"，用 Web Audio 现场合成，不需要任何音频文件 */
+function playTick(level) {
+  if (level <= 0) return;
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended" && audioCtx.resume) audioCtx.resume();
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 520 + level * 90;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.015 + level * 0.022, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09 + level * 0.02);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.12 + level * 0.03);
+  } catch (e) {}
 }
 
 /* ---------------- 生成 ---------------- */
+/* 没有自定义菜、又生成满 3 次时，给一次引导；每个用户只给一次（重装才会再有） */
+function showCustomTip() {
+  $("placeholder").hidden = true;
+  $("result").hidden = true;
+  var box = $("tipMsg");
+  box.innerHTML = "";
+  box.appendChild(document.createTextNode("没有想吃的？试一试上面第二个"));
+  var hl = document.createElement("span");
+  hl.className = "hl";
+  hl.textContent = "「我的食堂」";
+  box.appendChild(hl);
+  box.appendChild(document.createTextNode("，可以把食堂或者餐馆的菜填进去哦"));
+  box.hidden = false;
+
+  state.hintShown = true;
+  savePref("hintShown", "1");
+  $("genBtn").textContent = "换一餐";
+}
+
 function generate() {
+  var counting = (state.custom.length === 0 && state.filter !== MINE_CAT);
+  if (counting) {
+    state.genCount++;
+    savePref("genCount", String(state.genCount));
+    if (!state.hintShown && state.genCount >= 3) {
+      doFeedback();
+      showCustomTip();
+      return;
+    }
+  }
+
   var list = pool();
   if (list.length === 0) {
-    toast("这个分类还没有菜，去“我的菜谱”加一个吧");
+    if (state.filter === MINE_CAT) {
+      // 我的食堂还是空的，直接把添加页面打开，别让用户卡在这
+      openSheet("mineSheet");
+    } else {
+      toast("这个分类还没有菜");
+    }
     return;
   }
   var d = list[Math.floor(Math.random() * list.length)];
@@ -386,20 +487,17 @@ function generate() {
   state.generated = true;
 
   $("placeholder").hidden = true;
+  $("tipMsg").hidden = true;
   $("result").hidden = false;
   $("dishName").textContent = d.name;
 
+  // 只有一个标签：菜品类别（原来自定义菜会重复出现两个一样的标签）
   var meta = $("dishMeta");
   meta.innerHTML = "";
-  var tags = (d.tags || []).slice(0, 3);
-  if (d.mine) tags.unshift("我的菜谱");
-  else tags.unshift(d.cat);
-  tags.forEach(function (t) {
-    var s = document.createElement("span");
-    s.className = "tag";
-    s.textContent = t;
-    meta.appendChild(s);
-  });
+  var s = document.createElement("span");
+  s.className = "tag";
+  s.textContent = d.cat;
+  meta.appendChild(s);
 
   var nameEl = $("dishName");
   nameEl.style.animation = "none";
@@ -407,6 +505,8 @@ function generate() {
   nameEl.style.animation = "";
 
   $("genBtn").textContent = "换一餐";
+
+  doFeedback();
 }
 
 /* ---------------- 我的菜谱 ---------------- */
@@ -504,7 +604,7 @@ function applyInfo(info) {
   var banner = $("banner");
   if (s.hasApkUpdate) {
     banner.hidden = false;
-    $("bannerText").textContent = "App 有新版本可以安装";
+    $("bannerText").textContent = "发现新版本 App，建议更新";
   } else {
     banner.hidden = true;
   }
@@ -550,8 +650,19 @@ function boot() {
   state.custom = loadCustom();
 
   // 配色：先按存过的值贴上，再画可选色块
-  themeId = themeById(loadPref("theme", "mint")).id;
+  themeId = themeById(loadPref("theme", "celadon")).id;
   applyTheme(themeId, false);
+
+  // 其它偏好（都存在手机本地，热更新不会丢）
+  state.genCount = parseInt(loadPref("genCount", "0"), 10) || 0;
+  state.hintShown = loadPref("hintShown", "") === "1";
+  var vv = parseInt(loadPref("vib", "2"), 10);
+  state.vibLevel = isNaN(vv) ? 2 : vv;
+  var ss = parseInt(loadPref("snd", "1"), 10);
+  state.sndLevel = isNaN(ss) ? 1 : ss;
+
+  bindSeg("vibSeg", "vibLevel", "vib", function (lv) { if (lv > 0) doFeedback(); });
+  bindSeg("sndSeg", "sndLevel", "snd", function (lv) { playTick(lv); });
 
   renderChips();
   renderMine();
@@ -565,28 +676,12 @@ function boot() {
   $("newDish").addEventListener("keydown", function (e) {
     if (e.key === "Enter") addDish();
   });
-  $("openMine").onclick = function () { openSheet("mineSheet"); };
-  $("openSet").onclick = function () {
-    $("srcInput").value = (state.info && state.info.source) || (NATIVE && NATIVE.getSource ? NATIVE.getSource() : "");
-    openSheet("setSheet");
-  };
+  $("manageRow").onclick = function () { openSheet("mineSheet"); };
+  $("openSet").onclick = function () { openSheet("setSheet"); };
   $("mask").onclick = closeSheets;
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) {
     b.onclick = closeSheets;
   });
-
-  $("saveSrc").onclick = function () {
-    var v = ($("srcInput").value || "").trim();
-    if (!v) { toast("请输入 用户名/仓库名"); return; }
-    if (v.indexOf("/") < 0) { toast("格式应为 用户名/仓库名"); return; }
-    if (NATIVE && NATIVE.setSource) {
-      NATIVE.setSource(v);
-      toast("已保存更新源");
-      setTimeout(checkUpdate, 500);
-    } else {
-      toast("浏览器里无法保存");
-    }
-  };
 
   $("checkBtn").onclick = checkUpdate;
 
@@ -634,9 +729,8 @@ function boot() {
     var info = null;
     try { info = JSON.parse(NATIVE.getInfo()); } catch (e) {}
     if (info) applyInfo(info);
-    $("srcInput").value = (info && info.source) || "";
   } else {
-    applyInfo({ builtinWebVersion: 1, webVersion: 1, appVersion: "浏览器预览", source: "" });
+    applyInfo({ builtinWebVersion: 5, webVersion: 5, appVersion: "浏览器预览", source: "" });
   }
 }
 

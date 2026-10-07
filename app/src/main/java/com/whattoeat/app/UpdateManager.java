@@ -25,11 +25,11 @@ import java.nio.charset.StandardCharsets;
  */
 public class UpdateManager {
 
-    /** 默认更新源，格式 "用户名/仓库名"。留空表示需要用户在 App 设置里自己填。 */
-    public static final String DEFAULT_SOURCE = "";
+    /** 默认更新源，格式 "用户名/仓库名"。已经写死，用户不需要自己填。 */
+    public static final String DEFAULT_SOURCE = "iqiahs/what-to-eat";
 
     /** 内置网页版本号，必须和 assets/www/version.json 里的 web 一致 */
-    public static final int BUILTIN_WEB_VERSION = 4;
+    public static final int BUILTIN_WEB_VERSION = 6;
 
     /** 默认分支名，仓库用 master 的话这里改成 "master"（App 也会自动尝试两个分支） */
     public static final String BRANCH = "main";

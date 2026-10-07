@@ -1,6 +1,6 @@
 {
-  "web": 4,
+  "web": 6,
   "files": ["index.html", "app.css", "app.js"],
-  "notes": "v4：启动时不再弹无意义的检查提示（只有手动检查才提示）",
-  "apkVersionCode": 4
+  "notes": "v6：我的食堂移到分类栏，紧跟「全部」右边第一个；空食堂时直接打开添加页",
+  "apkVersionCode": 6
 }

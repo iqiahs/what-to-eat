@@ -196,6 +196,22 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        /** 生成时轻轻震一下，level 0~3 */
+        @JavascriptInterface
+        public void vibrate(int level) {
+            if (level <= 0) return;
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+                if (v == null || !v.hasVibrator()) return;
+                int i = Math.min(level, 3);
+                int ms = new int[]{0, 12, 20, 30}[i];
+                int amp = new int[]{0, 70, 130, 200}[i];
+                v.vibrate(android.os.VibrationEffect.createOneShot(ms, amp));
+            } catch (Throwable ignored) {
+                // 没有振动马达或者被系统限制，忽略即可
+            }
+        }
+
         @JavascriptInterface
         public void resetWeb() {
             store.clearUpdate();
